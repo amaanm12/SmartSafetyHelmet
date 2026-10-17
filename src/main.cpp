@@ -1,54 +1,39 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include "sensor.h"
 
-// ESP32-WROOM-32 default I2C pins: SDA = GPIO 21, SCL = GPIO 22.
+#include "sensor.h"
+#include "sos_button.h"
+#include "wifi_communication.h"
+
+namespace {
+// These pins match the ESP32-WROOM-32 wiring in README.md.
+constexpr int I2C_SDA_PIN = 21;
+constexpr int I2C_SCL_PIN = 22;
+constexpr int SOS_BUTTON_PIN = 27;
+
 IMUSensor imu;
+SosButton sosButton;
+WifiCommunication wifi;
+}
 
 void setup() {
     Serial.begin(115200);
-    delay(1000);
 
-    Serial.println("ESP32-WROOM-32 is working!");
-
-    WiFi.mode(WIFI_STA);
-    Serial.println("Scanning WiFi networks...");
-
-    // Set up the IMU module on the ESP32 I2C pins.
-    if (!imu.begin(21, 22)) {
-        Serial.println("IMU initialization failed. Check the wiring.");
-        while (true) {
-            delay(1000);
-        }
+    // setup() runs once after the ESP32 powers on or resets. Stop here if the
+    // MPU6050 is not connected, because there would be no real sensor data to send.
+    if (!imu.begin(I2C_SDA_PIN, I2C_SCL_PIN)) {
+        Serial.println("MPU6050 initialization failed. Check the wiring.");
+        while (true) delay(1000);
     }
+
+    // Start the button reader and connect the Wi-Fi/API services.
+    sosButton.begin(SOS_BUTTON_PIN);
+    wifi.begin();
 }
 
 void loop() {
-    /*
-    int networks = WiFi.scanNetworks();
-
-    Serial.printf("Found %d networks\n", networks);
-
-    for (int i = 0; i < networks; i++) {
-        Serial.println(WiFi.SSID(i));
-    }
-        */
-
-   // delay(5000);
-    // Read the latest sample from the MPU6050.
+    // loop() repeats continuously: read the sensors, pass the latest readings
+    // to the web server, then wait briefly before taking the next sample.
     imu.update();
-
-    IMUData sensorReadings = imu.getData();
-
-    Serial.printf("Acceleration [m/s^2]  X: %+7.2f  Y: %+7.2f  Z: %+7.2f\n",
-                  sensorReadings.accX,
-                  sensorReadings.accY,
-                  sensorReadings.accZ);
-    Serial.printf("Gyroscope [rad/s]     X: %+7.2f  Y: %+7.2f  Z: %+7.2f\n",
-                  sensorReadings.gyroX,
-                  sensorReadings.gyroY,
-                  sensorReadings.gyroZ);
-    Serial.printf("Temperature           %5.1f C\n", sensorReadings.temp);
-    Serial.println("-----------------------------------------------");
+    wifi.update(imu.getData(), sosButton.update());
     delay(100);
 }

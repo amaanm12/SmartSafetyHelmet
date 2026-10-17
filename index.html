@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#09111d">
+  <title>ShieldGuard | Construction Safety Command</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Apply the saved theme before the page paints to prevent a bright/dark flash.
+    try {
+      const savedTheme = localStorage.getItem('shieldguard-theme');
+      document.documentElement.dataset.theme = savedTheme || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    } catch (_) {
+      document.documentElement.dataset.theme = 'dark';
+    }
+  </script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: { 950: '#080e18', 900: '#0b1422', 850: '#101b2b', 800: '#152235' },
+            signal: { green: '#34d399', amber: '#fbbf24', red: '#fb5b63', blue: '#60a5fa' }
+          },
+          boxShadow: { panel: '0 12px 34px rgba(0,0,0,.22)' }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root, :root[data-theme="dark"] {
+      color-scheme: dark;
+      --page: #0b1120;
+      --surface: #111a2b;
+      --surface-raised: #172337;
+      --surface-inset: #0d1524;
+      --text-primary: #e7edf5;
+      --text-secondary: #c2ccda;
+      --text-muted: #91a0b4;
+      --border: rgba(148, 163, 184, .16);
+      --border-strong: rgba(148, 163, 184, .24);
+      --subtle: rgba(148, 163, 184, .07);
+      --modal-scrim: rgba(3, 7, 18, .72);
+      --shadow: 0 8px 24px rgba(0, 0, 0, .18);
+      --blue: #7db5ff;
+      --green: #4adea0;
+      --amber: #f6c453;
+      --red: #ff6b73;
+      --violet: #b9a0ff;
+      --primary-button-text: #08111f;
+    }
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --page: #f4f6f9;
+      --surface: #ffffff;
+      --surface-raised: #f7f9fc;
+      --surface-inset: #f0f3f7;
+      --text-primary: #172235;
+      --text-secondary: #35445a;
+      --text-muted: #5a687b;
+      --border: #dce3eb;
+      --border-strong: #c6d0dc;
+      --subtle: #f1f4f8;
+      --modal-scrim: rgba(15, 23, 42, .42);
+      --shadow: 0 4px 16px rgba(15, 23, 42, .06);
+      --blue: #1d4ed8;
+      --green: #16713a;
+      --amber: #8a5700;
+      --red: #b4232d;
+      --violet: #6d3ec1;
+      --primary-button-text: #ffffff;
+    }
+    body { background: var(--page) !important; color: var(--text-primary) !important; }
+    .grid-texture { background: var(--page) !important; background-image: none !important; }
+    header { background: var(--surface) !important; border-color: var(--border) !important; box-shadow: none !important; }
+    [class*="bg-ink-900"] { background-color: var(--surface) !important; }
+    [class*="bg-ink-850"], [class*="bg-ink-800"] { background-color: var(--surface-raised) !important; }
+    [class*="bg-ink-950"] { background-color: var(--surface-inset) !important; }
+    [class*="text-slate-100"], [class*="text-slate-200"], .text-white { color: var(--text-primary) !important; }
+    [class*="text-slate-300"], [class*="text-slate-400"] { color: var(--text-secondary) !important; }
+    [class*="text-slate-500"], [class*="text-slate-600"], [class*="text-slate-700"] { color: var(--text-muted) !important; }
+    [class*="text-signal-blue"] { color: var(--blue) !important; }
+    [class*="text-signal-green"] { color: var(--green) !important; }
+    [class*="text-signal-amber"] { color: var(--amber) !important; }
+    [class*="text-signal-red"] { color: var(--red) !important; }
+    [class*="text-violet-"] { color: var(--violet) !important; }
+    [class*="border-white"], [class*="border-signal-"] { border-color: var(--border) !important; }
+    [class*="bg-white/"] { background-color: var(--subtle) !important; }
+    article, #settings-modal > div { border-color: var(--border) !important; box-shadow: var(--shadow) !important; }
+    #settings-modal { background: var(--modal-scrim) !important; backdrop-filter: blur(5px); }
+    #settings-modal > div { background: var(--surface) !important; color: var(--text-primary) !important; }
+    #settings-modal pre { color: var(--text-secondary) !important; }
+    input { color: var(--text-primary) !important; background: var(--surface-inset) !important; border-color: var(--border-strong) !important; }
+    input::placeholder { color: var(--text-muted) !important; opacity: 1; }
+    button { transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease; }
+    #theme-toggle, #open-settings, [data-action="acknowledge"] {
+      color: var(--text-secondary) !important;
+      background: var(--surface-raised) !important;
+      border: 1px solid var(--border) !important;
+    }
+    #theme-toggle:hover, #open-settings:hover, [data-action="acknowledge"]:hover { background: var(--subtle) !important; border-color: var(--border-strong) !important; }
+    #search-worker, #settings-form button[type="submit"] { color: var(--primary-button-text) !important; }
+    #toast { color: var(--text-primary) !important; background: var(--surface-raised) !important; border-color: var(--border-strong) !important; box-shadow: var(--shadow) !important; }
+    footer { border-color: var(--border) !important; }
+    #worker-notice { border-color: var(--border) !important; }
+    .sos-flash, .fall-flash { animation: alert-pulse 1.1s ease-in-out infinite; border-color: var(--red) !important; }
+    @keyframes alert-pulse {
+      0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--red) 45%, transparent), 0 0 20px color-mix(in srgb, var(--red) 14%, transparent); }
+      50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--red) 85%, transparent), 0 0 28px color-mix(in srgb, var(--red) 27%, transparent); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-100 antialiased selection:bg-signal-blue/30">
+  <div class="grid-texture min-h-screen">
+    <header class="border-b border-white/10 bg-ink-900/90">
+      <div class="mx-auto flex max-w-[1600px] flex-col gap-5 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div class="flex items-center gap-4">
+          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-signal-blue/30 bg-signal-blue/10 text-signal-blue">
+            <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-3Z"/><path d="M8.5 12h7M12 8.5v7"/></svg>
+          </div>
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[.22em] text-signal-blue">Site operations · live monitoring</p>
+            <h1 class="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">ShieldGuard: Construction Safety Command</h1>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 sm:gap-5">
+          <div class="mr-1 hidden text-right sm:block">
+            <p class="text-[10px] font-semibold uppercase tracking-[.18em] text-slate-500">Local time</p>
+            <p id="clock" class="mt-1 font-mono text-sm tabular-nums text-slate-200">--:--:--</p>
+          </div>
+          <div class="flex items-center gap-2 rounded-full border border-white/10 bg-ink-850 px-3 py-2" aria-live="polite">
+            <span id="connection-dot" class="h-2 w-2 rounded-full bg-signal-amber shadow-[0_0_10px_currentColor]"></span>
+            <span id="connection-label" class="text-xs font-semibold text-slate-300">SIMULATING</span>
+            <span id="connection-detail" class="hidden max-w-48 truncate text-xs text-slate-500 md:inline">Demo sensor feed</span>
+          </div>
+          <button id="theme-toggle" type="button" class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-signal-blue/50" aria-label="Switch theme">
+            <span id="theme-icon" aria-hidden="true">◐</span><span id="theme-label">Light theme</span>
+          </button>
+          <button id="search-worker" type="button" class="inline-flex items-center gap-2 rounded-xl bg-signal-blue px-3.5 py-2.5 text-sm font-bold text-ink-950 transition hover:bg-blue-300 focus:outline-none focus:ring-2 focus:ring-signal-blue/50">
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.5"/><path d="m16 16 4.5 4.5M10.8 7.8v6M7.8 10.8h6"/></svg>
+            Search active worker
+          </button>
+          <button id="open-settings" type="button" class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-signal-blue/40 hover:bg-signal-blue/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-signal-blue/50">
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path d="m19.4 15 .1.1a1.8 1.8 0 0 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3 .9v.2a1.8 1.8 0 0 1-3.6 0v-.2a1.8 1.8 0 0 0-3-.9l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-.9-3h-.2a1.8 1.8 0 0 1 0-3.6h.2a1.8 1.8 0 0 0 .9-3l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3-.9v-.2a1.8 1.8 0 0 1 3.6 0v.2a1.8 1.8 0 0 0 3 .9l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 0 1 0 3.6h-.2a1.8 1.8 0 0 0-.9 3Z" transform="translate(1.2 1.2) scale(.9)"/></svg>
+            Edit IP
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <section aria-labelledby="overview-heading">
+        <div class="mb-4 flex items-end justify-between gap-4">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[.2em] text-slate-500">Field snapshot</p>
+            <h2 id="overview-heading" class="mt-1 text-lg font-semibold">Site overview</h2>
+          </div>
+          <p id="last-updated" class="text-right text-xs text-slate-500">Waiting for first sensor update</p>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <article class="rounded-2xl border border-white/[.08] bg-ink-900/90 p-5 shadow-panel">
+            <div class="flex items-center justify-between"><p class="text-sm font-medium text-slate-400">Workers active</p><span class="rounded-lg bg-signal-blue/10 p-2 text-signal-blue"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M16 20v-1.5a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4V20M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 20v-1.5a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div>
+            <div class="mt-4 flex items-baseline gap-2"><span id="active-count" class="text-4xl font-semibold tracking-tight tabular-nums">0</span><span class="text-xs text-slate-500">on site</span></div>
+            <p class="mt-2 text-xs text-slate-500">Workers reporting valid sensor data</p>
+          </article>
+          <article id="alert-stat-card" class="rounded-2xl border border-white/[.08] bg-ink-900/90 p-5 shadow-panel transition-colors">
+            <div class="flex items-center justify-between"><p class="text-sm font-medium text-slate-400">Alerts / SOS active</p><span id="alert-icon" class="rounded-lg bg-signal-green/10 p-2 text-signal-green"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"/></svg></span></div>
+            <div class="mt-4 flex items-baseline gap-2"><span id="alert-count" class="text-4xl font-semibold tracking-tight tabular-nums">0</span><span id="alert-caption" class="text-xs text-slate-500">all clear</span></div>
+            <p class="mt-2 text-xs text-slate-500">SOS and unacknowledged fall events</p>
+          </article>
+          <article class="rounded-2xl border border-white/[.08] bg-ink-900/90 p-5 shadow-panel sm:col-span-2 xl:col-span-1">
+            <div class="flex items-center justify-between"><p class="text-sm font-medium text-slate-400">Average body temperature</p><span class="rounded-lg bg-signal-amber/10 p-2 text-signal-amber"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 14.76V5a3 3 0 0 0-6 0v9.76a5 5 0 1 0 6 0Z"/><path d="M11 12v6"/></svg></span></div>
+            <div class="mt-4 flex items-baseline gap-2"><span id="average-temp" class="text-4xl font-semibold tracking-tight tabular-nums">--.-</span><span class="text-sm text-slate-400">°C</span></div>
+            <p class="mt-2 text-xs text-slate-500">Across workers with body temperature sensors</p>
+          </article>
+        </div>
+      </section>
+
+      <div id="worker-notice" class="mt-5 hidden rounded-xl border px-4 py-3 text-sm" role="status" aria-live="polite"></div>
+
+      <section class="mt-8" aria-labelledby="workers-heading">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div><p class="text-[11px] font-semibold uppercase tracking-[.2em] text-slate-500">Personnel telemetry</p><h2 id="workers-heading" class="mt-1 text-lg font-semibold">Worker status</h2></div>
+          <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+            <span class="rounded-full border border-signal-green/20 bg-signal-green/5 px-2.5 py-1 text-signal-green">Normal &lt; 37.5°C</span>
+            <span class="rounded-full border border-signal-amber/20 bg-signal-amber/5 px-2.5 py-1 text-signal-amber">Elevated 37.5–38.5°C</span>
+            <span class="rounded-full border border-signal-red/20 bg-signal-red/5 px-2.5 py-1 text-signal-red">Critical &gt; 38.5°C</span>
+          </div>
+        </div>
+        <div id="worker-grid" class="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3" aria-live="polite"></div>
+      </section>
+
+      <footer class="mt-8 flex flex-col gap-2 border-t border-white/[.07] py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+        <p>ShieldGuard field console <span class="px-1 text-slate-700">·</span> Sensor refresh every 2 seconds</p>
+        <button id="help-link" type="button" class="self-start text-signal-blue hover:text-blue-300 sm:self-auto">Connection & browser setup</button>
+      </footer>
+    </main>
+  </div>
+
+  <div id="settings-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="w-full max-w-xl rounded-2xl border border-white/10 bg-ink-900 p-5 shadow-2xl sm:p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div><p class="text-[11px] font-semibold uppercase tracking-[.2em] text-signal-blue">Device connection</p><h2 id="settings-title" class="mt-1 text-xl font-semibold">Connection settings</h2></div>
+        <button id="close-settings" type="button" class="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white" aria-label="Close settings">✕</button>
+      </div>
+      <p class="mt-3 text-sm leading-6 text-slate-400">Enter the ESP32's local Wi-Fi IP address. The dashboard polls <code class="rounded bg-white/5 px-1.5 py-0.5 text-signal-blue">http://&lt;IP&gt;/api/data</code> every 2 seconds. Leave it blank to use the live demo simulation.</p>
+      <form id="settings-form" class="mt-5">
+        <label for="esp32-ip" class="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-300">ESP32 local IP address</label>
+        <div class="flex flex-col gap-2 sm:flex-row">
+          <input id="esp32-ip" name="ip" type="text" inputmode="url" autocomplete="url" placeholder="192.168.1.100" class="min-w-0 flex-1 rounded-xl border border-white/10 bg-ink-950 px-4 py-3 font-mono text-sm text-white outline-none placeholder:text-slate-600 focus:border-signal-blue/60 focus:ring-2 focus:ring-signal-blue/20">
+          <button type="submit" class="rounded-xl bg-signal-blue px-5 py-3 text-sm font-bold text-ink-950 transition hover:bg-blue-300">Save & connect</button>
+        </div>
+        <button id="use-demo" type="button" class="mt-3 text-xs font-semibold text-slate-400 underline decoration-slate-700 underline-offset-4 hover:text-white">Use simulated demo feed</button>
+      </form>
+      <div class="mt-6 rounded-xl border border-signal-amber/20 bg-signal-amber/[.06] p-4">
+        <h3 class="text-sm font-semibold text-signal-amber">GitHub Pages uses HTTPS</h3>
+        <p class="mt-2 text-xs leading-5 text-slate-300">This page searches for <code class="text-slate-100">http://shieldguard.local/api/data</code> using mDNS as soon as it opens. A browser cannot receive the ESP32's UDP broadcast directly; the beacon is available to local network tools, while this page uses mDNS and HTTP. In Chrome or Edge, allow the browser's local network access prompt for this site. If HTTP is still blocked, open the site controls beside the address bar, choose <strong>Site settings</strong>, set <strong>Insecure content</strong> to <strong>Allow</strong>, then reload. The ESP32 also sends CORS headers. Browser labels vary, and some browser/network combinations still block this connection.</p>
+      </div>
+      <div class="mt-4 rounded-xl border border-white/[.07] bg-white/[.025] p-4">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Expected JSON shape</h3>
+        <pre class="mt-2 overflow-x-auto text-[11px] leading-5 text-slate-400">{ "workers": [{ "id": "1", "temperatureC": null,
+  "sensorTemperatureC": 25.4,
+  "acceleration": { "x": 0.1, "y": 0.0, "z": 9.8 },
+  "gyroscope": { "x": 0.0, "y": 0.1, "z": 0.0 }, "sos": false }] }</pre>
+        <p class="mt-2 text-[11px] leading-5 text-slate-500">Also accepts a single worker object, common flat accX/gyroX fields, or arrays [x, y, z].</p>
+      </div>
+    </div>
+  </div>
+  <div id="toast" class="pointer-events-none fixed bottom-5 left-1/2 z-50 hidden -translate-x-1/2 rounded-xl border border-white/10 bg-ink-800 px-4 py-3 text-sm text-white shadow-2xl" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const POLL_INTERVAL_MS = 2000;
+      const REQUEST_TIMEOUT_MS = 1000;
+      const FALL_THRESHOLD_MPS2 = 25.0; // Approx. 2.55 g impact magnitude.
+      const DEFAULT_DISCOVERY_HOST = 'shieldguard.local';
+      const STORAGE_KEY = 'shieldguard-esp32-ip';
+      const CONNECTED_KEY = 'shieldguard-had-worker';
+      const $ = (id) => document.getElementById(id);
+      const elements = {
+        clock: $('clock'), connectionDot: $('connection-dot'), connectionLabel: $('connection-label'),
+        connectionDetail: $('connection-detail'), activeCount: $('active-count'), alertCount: $('alert-count'),
+        alertCaption: $('alert-caption'), alertCard: $('alert-stat-card'), alertIcon: $('alert-icon'),
+        averageTemp: $('average-temp'), lastUpdated: $('last-updated'), workerGrid: $('worker-grid'), notice: $('worker-notice'),
+        modal: $('settings-modal'), ipInput: $('esp32-ip'), toast: $('toast')
+      };
+
+      let endpointHost = localStorage.getItem(STORAGE_KEY) || '';
+      let lastSosState = new Map();
+      let acknowledged = new Set();
+      let latestWorkers = [];
+      let toastTimer;
+      let audioContext;
+      let audioUnlocked = false;
+      let pendingSound = false;
+      let pollInProgress = false;
+      let latestMode = 'simulating';
+      let hasConnectedWorker = localStorage.getItem(CONNECTED_KEY) === 'true';
+      let searchRequested = true;
+      let discoveryEnabled = true;
+      let simulatedWorkers = [
+        { id: 'demo-1', name: 'Demo Worker #1', temperatureC: 36.7, sensorTemperatureC: null, acc: { x: 0.08, y: -0.04, z: 9.79 }, gyro: { x: 0.02, y: 0.01, z: -0.01 }, sos: false }
+      ];
+
+      function tickClock() {
+        elements.clock.textContent = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
+      }
+
+      function showToast(message) {
+        elements.toast.textContent = message;
+        elements.toast.classList.remove('hidden');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => elements.toast.classList.add('hidden'), 3200);
+      }
+
+      function setConnection(state, detail) {
+        const styles = {
+          connected: { text: 'CONNECTED', dot: 'bg-signal-green', label: 'text-signal-green' },
+          disconnected: { text: 'DISCONNECTED', dot: 'bg-signal-red', label: 'text-signal-red' },
+          simulating: { text: 'SIMULATING', dot: 'bg-signal-amber', label: 'text-signal-amber' }
+        };
+        const style = styles[state];
+        elements.connectionLabel.textContent = style.text;
+        elements.connectionLabel.className = `text-xs font-semibold ${style.label}`;
+        elements.connectionDot.className = `h-2 w-2 rounded-full ${style.dot} shadow-[0_0_10px_currentColor]`;
+        elements.connectionDetail.textContent = detail;
+        elements.connectionDetail.title = detail;
+      }
+
+      function setWorkerNotice(state, message) {
+        if (state === 'connected') {
+          elements.notice.classList.add('hidden');
+          elements.notice.textContent = '';
+          return;
+        }
+        const red = state === 'disconnected';
+        elements.notice.className = `mt-5 rounded-xl border px-4 py-3 text-sm ${red ? 'border-signal-red/30 bg-signal-red/[.08] text-signal-red' : 'border-signal-amber/25 bg-signal-amber/[.06] text-signal-amber'}`;
+        elements.notice.textContent = message;
+      }
+
+      // Tolerate nested vectors, [x,y,z] arrays, Adafruit-style flat fields, and common aliases.
+      function vectorFrom(source, nestedKeys, flatPrefixes) {
+        for (const key of nestedKeys) {
+          const vector = source[key];
+          if (Array.isArray(vector)) return { x: numberOr(vector[0]), y: numberOr(vector[1]), z: numberOr(vector[2]) };
+          if (vector && typeof vector === 'object') return { x: numberOr(vector.x), y: numberOr(vector.y), z: numberOr(vector.z) };
+        }
+        const result = {};
+        for (const axis of ['x', 'y', 'z']) {
+          const candidates = flatPrefixes.flatMap((prefix) => [`${prefix}${axis}`, `${prefix}_${axis}`]);
+          const found = candidates.find((key) => source[key] !== undefined);
+          result[axis] = numberOr(found === undefined ? undefined : source[found]);
+        }
+        return result;
+      }
+
+      function numberOr(value, fallback = 0) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : fallback;
+      }
+
+      function normalizePayload(payload) {
+        const rows = Array.isArray(payload) ? payload :
+          (payload && Array.isArray(payload.workers) ? payload.workers :
+          (payload && Array.isArray(payload.data) ? payload.data : [payload]));
+        return rows.filter((row) => row && typeof row === 'object').map((row, index) => {
+          const id = String(row.id ?? row.workerId ?? row.worker_id ?? index + 1);
+          const acceleration = vectorFrom(row, ['acceleration', 'accelerometer', 'accel'], ['acc', 'accel', 'acceleration']);
+          const gyroscope = vectorFrom(row, ['gyroscope', 'gyro'], ['gyro', 'gyroscope']);
+          const temperature = row.bodyTemperatureC ?? row.temperatureC ?? row.bodyTemperature ?? row.temperature;
+          const sensorTemperature = row.sensorTemperatureC ?? row.mpuTemperatureC ?? row.imuTemperatureC ?? row.tempC ?? row.temp;
+          return {
+            id,
+            name: String(row.name ?? row.workerName ?? `Worker #${id}`),
+            active: row.active !== false && row.online !== false,
+            temperatureC: temperature !== null && temperature !== undefined && Number.isFinite(Number(temperature)) ? Number(temperature) : null,
+            sensorTemperatureC: sensorTemperature !== null && sensorTemperature !== undefined && Number.isFinite(Number(sensorTemperature)) ? Number(sensorTemperature) : null,
+            acceleration,
+            gyroscope,
+            sos: Boolean(row.sos ?? row.sosActive ?? row.alarm ?? row.touchAlarm),
+            fallReported: Boolean(row.fallDetected ?? row.fall ?? false)
+          };
+        });
+      }
+
+      function advanceSimulation() {
+        simulatedWorkers = simulatedWorkers.map((worker) => {
+          const movement = Math.random() > 0.36;
+          const noise = (scale) => (Math.random() - 0.5) * scale;
+          const next = {
+            ...worker,
+            temperatureC: Math.max(36.3, Math.min(39.0, worker.temperatureC + noise(0.045))),
+            acc: movement
+              ? { x: noise(1.1), y: noise(1.1), z: 9.81 + noise(1.1) }
+              : { x: noise(0.12), y: noise(0.12), z: 9.81 + noise(0.12) },
+            gyro: movement
+              ? { x: noise(0.8), y: noise(0.8), z: noise(0.8) }
+              : { x: noise(0.025), y: noise(0.025), z: noise(0.025) }
+          };
+          // Rare demo events make alert styling and acknowledgement easy to preview.
+          if (!next.sos && Math.random() < 0.003) next.sos = true;
+          else if (next.sos && Math.random() < 0.12) next.sos = false;
+          if (Math.random() < 0.002) next.acc = { x: 0.5, y: 0.3, z: 25.2 };
+          return {
+            id: next.id, name: next.name, active: true, temperatureC: next.temperatureC,
+            acceleration: next.acc, gyroscope: next.gyro, sos: next.sos, fallReported: false
+          };
+        });
+        return simulatedWorkers;
+      }
+
+      function vectorMagnitude(vector) {
+        return Math.hypot(vector.x, vector.y, vector.z);
+      }
+
+      function temperatureStyle(temp) {
+        if (temp === null) return { label: 'BODY SENSOR N/A', text: 'text-slate-400', badge: 'border-slate-700 bg-slate-800 text-slate-400', bar: 'bg-slate-600', width: 0 };
+        if (temp > 38.5) return { label: 'CRITICAL', text: 'text-signal-red', badge: 'border-signal-red/25 bg-signal-red/10 text-signal-red', bar: 'bg-signal-red', width: Math.min(100, Math.max(8, (temp - 35) / 5 * 100)) };
+        if (temp >= 37.5) return { label: 'ELEVATED', text: 'text-signal-amber', badge: 'border-signal-amber/25 bg-signal-amber/10 text-signal-amber', bar: 'bg-signal-amber', width: Math.min(100, Math.max(8, (temp - 35) / 5 * 100)) };
+        return { label: 'NORMAL', text: 'text-signal-green', badge: 'border-signal-green/25 bg-signal-green/10 text-signal-green', bar: 'bg-signal-green', width: Math.min(100, Math.max(8, (temp - 35) / 5 * 100)) };
+      }
+
+      function isMovementActive(worker) {
+        const accelerationDelta = Math.abs(vectorMagnitude(worker.acceleration) - 9.81);
+        return accelerationDelta > 0.35 || vectorMagnitude(worker.gyroscope) > 0.15;
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+      }
+
+      function workerCard(worker) {
+        const key = String(worker.id);
+        const sosAcknowledged = acknowledged.has(`sos:${key}`);
+        const fallAcknowledged = acknowledged.has(`fall:${key}`);
+        const acceleration = worker.acceleration;
+        const gyroscope = worker.gyroscope;
+        const impact = vectorMagnitude(acceleration) >= FALL_THRESHOLD_MPS2 || worker.fallReported;
+        const sosActive = worker.sos;
+        const alertActive = (sosActive && !sosAcknowledged) || (impact && !fallAcknowledged);
+        const tempStyle = temperatureStyle(worker.temperatureC);
+        const movement = isMovementActive(worker) ? 'ACTIVE' : 'STILL';
+        const cardClass = alertActive ? (sosActive && !sosAcknowledged ? 'sos-flash' : 'fall-flash') : '';
+        const statusBadge = sosActive && !sosAcknowledged
+          ? '<span class="rounded-full border border-signal-red/30 bg-signal-red/10 px-2.5 py-1 text-[10px] font-bold tracking-wider text-signal-red">SOS ACTIVE</span>'
+          : impact && !fallAcknowledged
+            ? '<span class="rounded-full border border-signal-red/30 bg-signal-red/10 px-2.5 py-1 text-[10px] font-bold tracking-wider text-signal-red">FALL DETECTED</span>'
+            : `<span class="rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-wider ${tempStyle.badge}">${tempStyle.label}</span>`;
+        const tempDisplay = worker.temperatureC === null ? '—.-' : worker.temperatureC.toFixed(1);
+        const sensorTempNote = worker.sensorTemperatureC === null || worker.sensorTemperatureC === undefined
+          ? '<p class="mt-1 text-[10px] text-slate-600">No body temperature sensor reported</p>'
+          : `<p class="mt-1 text-[10px] text-slate-500">MPU6050 board temperature: ${worker.sensorTemperatureC.toFixed(1)} °C</p>`;
+        const alertLine = sosActive && !sosAcknowledged
+          ? '<p class="mt-3 flex items-center gap-2 text-xs font-semibold text-signal-red"><span class="h-1.5 w-1.5 animate-pulse rounded-full bg-signal-red"></span> SOS touch alarm is active</p>'
+          : impact && !fallAcknowledged
+            ? '<p class="mt-3 flex items-center gap-2 text-xs font-semibold text-signal-red"><span class="h-1.5 w-1.5 animate-pulse rounded-full bg-signal-red"></span> High acceleration impact detected</p>'
+            : '<p class="mt-3 text-xs text-slate-500">No active emergency alert</p>';
+
+        return `<article class="worker-card ${cardClass} rounded-2xl border border-white/[.09] bg-ink-900/95 p-4 shadow-panel transition sm:p-5" data-worker-id="${escapeHtml(key)}">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-3">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[.08] bg-ink-800 font-mono text-sm font-bold text-slate-300">${escapeHtml(key.slice(0, 3))}</div>
+              <div class="min-w-0"><h3 class="truncate font-semibold text-white">${escapeHtml(worker.name)}</h3><p class="mt-0.5 text-[11px] text-slate-500">${worker.active ? 'ON SHIFT · SENSOR ONLINE' : 'OFFLINE'}</p></div>
+            </div>
+            ${statusBadge}
+          </div>
+          <div class="mt-4 rounded-xl border border-white/[.06] bg-ink-950/70 p-3.5">
+            <div class="flex items-start justify-between gap-3">
+              <div><p class="text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Body temperature</p><p class="mt-1.5"><span class="text-3xl font-semibold tabular-nums ${tempStyle.text}">${tempDisplay}</span><span class="ml-1 text-sm text-slate-500">°C</span></p>${sensorTempNote}</div>
+              <span class="rounded-full border px-2 py-1 text-[9px] font-bold tracking-wider ${tempStyle.badge}">${tempStyle.label}</span>
+            </div>
+            <div class="mt-3 h-1 overflow-hidden rounded-full bg-white/[.07]"><div class="h-full rounded-full ${tempStyle.bar}" style="width:${tempStyle.width}%"></div></div>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <div class="rounded-xl border border-white/[.06] bg-white/[.02] p-3">
+              <div class="mb-2 flex items-center justify-between"><p class="text-[10px] font-semibold uppercase tracking-[.13em] text-slate-500">Acceleration</p><span class="text-[9px] text-slate-600">m/s²</span></div>
+              <div class="grid grid-cols-3 gap-1 font-mono text-xs tabular-nums"><div><span class="text-signal-blue">X</span> <span class="text-slate-200">${acceleration.x.toFixed(2)}</span></div><div><span class="text-signal-blue">Y</span> <span class="text-slate-200">${acceleration.y.toFixed(2)}</span></div><div><span class="text-signal-blue">Z</span> <span class="text-slate-200">${acceleration.z.toFixed(2)}</span></div></div>
+            </div>
+            <div class="rounded-xl border border-white/[.06] bg-white/[.02] p-3">
+              <div class="mb-2 flex items-center justify-between"><p class="text-[10px] font-semibold uppercase tracking-[.13em] text-slate-500">Gyroscope</p><span class="text-[9px] text-slate-600">rad/s</span></div>
+              <div class="grid grid-cols-3 gap-1 font-mono text-xs tabular-nums"><div><span class="text-violet-400">X</span> <span class="text-slate-200">${gyroscope.x.toFixed(2)}</span></div><div><span class="text-violet-400">Y</span> <span class="text-slate-200">${gyroscope.y.toFixed(2)}</span></div><div><span class="text-violet-400">Z</span> <span class="text-slate-200">${gyroscope.z.toFixed(2)}</span></div></div>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center justify-between rounded-xl border border-white/[.06] bg-white/[.02] px-3 py-2.5">
+            <div class="flex items-center gap-2"><span class="h-2 w-2 rounded-full ${impact && !fallAcknowledged ? 'bg-signal-red' : movement === 'ACTIVE' ? 'bg-signal-blue' : 'bg-slate-500'}"></span><span class="text-xs text-slate-400">Movement</span><span class="text-xs font-semibold ${impact && !fallAcknowledged ? 'text-signal-red' : movement === 'ACTIVE' ? 'text-signal-blue' : 'text-slate-300'}">${impact && !fallAcknowledged ? 'FALL DETECTED!' : movement}</span></div>
+            <div class="flex items-center gap-1.5"><span class="text-[10px] uppercase tracking-wider text-slate-500">SOS</span><span class="rounded-md px-2 py-1 text-[10px] font-bold ${sosActive && !sosAcknowledged ? 'bg-signal-red/15 text-signal-red' : 'bg-slate-800 text-slate-400'}">${sosActive && !sosAcknowledged ? 'TRIGGERED' : 'CLEAR'}</span></div>
+          </div>
+          ${alertLine}
+          <div class="mt-4 flex gap-2 border-t border-white/[.06] pt-4">
+            <button type="button" data-action="acknowledge" data-id="${escapeHtml(key)}" class="flex-1 rounded-lg border border-white/10 bg-white/[.04] px-3 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-white/[.09] focus:outline-none focus:ring-2 focus:ring-signal-blue/40 ${alertActive ? 'border-signal-red/25 text-signal-red hover:bg-signal-red/10' : ''}">${alertActive ? 'Acknowledge alert' : 'Clear acknowledged'}</button>
+            <button type="button" data-action="call" data-name="${escapeHtml(worker.name)}" class="flex-1 rounded-lg bg-signal-blue/10 px-3 py-2.5 text-xs font-semibold text-signal-blue transition hover:bg-signal-blue/20 focus:outline-none focus:ring-2 focus:ring-signal-blue/40">Call worker</button>
+          </div>
+        </article>`;
+      }
+
+      function unlockAudio() {
+        if (audioUnlocked) return;
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        try {
+          audioContext = audioContext || new AudioContextClass();
+          audioContext.resume().then(() => {
+            audioUnlocked = audioContext.state === 'running';
+            if (audioUnlocked && pendingSound) { pendingSound = false; playSosTone(); }
+          }).catch(() => {});
+        } catch (_) { /* Audio is an enhancement; visual alerts remain available. */ }
+      }
+
+      function playSosTone() {
+        if (!audioUnlocked || !audioContext || audioContext.state !== 'running') { pendingSound = true; return; }
+        try {
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+          oscillator.frequency.setValueAtTime(660, audioContext.currentTime + 0.18);
+          gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.14, audioContext.currentTime + 0.025);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.42);
+          oscillator.connect(gain);
+          gain.connect(audioContext.destination);
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + 0.44);
+        } catch (_) { /* Visual alert remains available if audio is unavailable. */ }
+      }
+
+      function render(workers, mode) {
+        const active = workers.filter((worker) => worker.active);
+        const tempReadings = active.map((worker) => worker.temperatureC).filter((value) => value !== null);
+        const alertWorkers = active.filter((worker) => {
+          const key = String(worker.id);
+          const fall = vectorMagnitude(worker.acceleration) >= FALL_THRESHOLD_MPS2 || worker.fallReported;
+          return (worker.sos && !acknowledged.has(`sos:${key}`)) || (fall && !acknowledged.has(`fall:${key}`));
+        });
+        elements.activeCount.textContent = String(active.length);
+        elements.alertCount.textContent = String(alertWorkers.length);
+        elements.alertCaption.textContent = alertWorkers.length ? `${alertWorkers.length} worker${alertWorkers.length === 1 ? '' : 's'} need attention` : 'all clear';
+        elements.alertCard.classList.toggle('border-signal-red/30', alertWorkers.length > 0);
+        elements.alertCard.classList.toggle('bg-signal-red/[.035]', alertWorkers.length > 0);
+        elements.alertIcon.className = alertWorkers.length
+          ? 'rounded-lg bg-signal-red/10 p-2 text-signal-red'
+          : 'rounded-lg bg-signal-green/10 p-2 text-signal-green';
+        elements.averageTemp.textContent = tempReadings.length ? (tempReadings.reduce((sum, value) => sum + value, 0) / tempReadings.length).toFixed(1) : '--.-';
+        const sorted = [...workers].sort((a, b) => {
+          const aKey = String(a.id), bKey = String(b.id);
+          const aAlert = (a.sos && !acknowledged.has(`sos:${aKey}`)) || ((a.fallReported || vectorMagnitude(a.acceleration) >= FALL_THRESHOLD_MPS2) && !acknowledged.has(`fall:${aKey}`));
+          const bAlert = (b.sos && !acknowledged.has(`sos:${bKey}`)) || ((b.fallReported || vectorMagnitude(b.acceleration) >= FALL_THRESHOLD_MPS2) && !acknowledged.has(`fall:${bKey}`));
+          return Number(bAlert) - Number(aAlert) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true });
+        });
+        elements.workerGrid.innerHTML = sorted.length
+          ? sorted.map(workerCard).join('')
+          : '<div class="rounded-2xl border border-dashed border-white/10 bg-ink-900/60 p-10 text-center text-sm text-slate-500 lg:col-span-2 2xl:col-span-3">No worker sensor data received yet.</div>';
+        elements.lastUpdated.textContent = `Updated ${new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date())} · ${mode === 'connected' ? 'ESP32 data' : 'demo feed'}`;
+      }
+
+      async function fetchWorkers(host) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        try {
+          const response = await fetch(`http://${host}/api/data`, {
+            method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' },
+            targetAddressSpace: 'local', signal: controller.signal
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          const workers = normalizePayload(payload);
+          if (!workers.length) throw new Error('The API returned no worker records');
+          clearTimeout(timeout);
+          return workers;
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+
+      function onWorkersReceived(workers, mode) {
+        latestWorkers = workers;
+        latestMode = mode;
+        const nextSosState = new Map();
+        for (const worker of workers) {
+          const key = String(worker.id);
+          const isSos = Boolean(worker.sos);
+          nextSosState.set(key, isSos);
+          if (isSos && lastSosState.get(key) !== true) playSosTone();
+          if (!isSos) acknowledged.delete(`sos:${key}`);
+          const hasFall = vectorMagnitude(worker.acceleration) >= FALL_THRESHOLD_MPS2 || worker.fallReported;
+          if (!hasFall) acknowledged.delete(`fall:${key}`);
+        }
+        lastSosState = nextSosState;
+        setConnection(mode, mode === 'connected' ? `http://${endpointHost}` : mode === 'disconnected' ? 'Worker connection lost · demo feed active' : discoveryEnabled ? `Searching ${DEFAULT_DISCOVERY_HOST} · demo feed active` : 'Simulated demo feed');
+        if (mode === 'connected') {
+          hasConnectedWorker = true;
+          localStorage.setItem(CONNECTED_KEY, 'true');
+          setWorkerNotice('connected', '');
+        } else if (mode === 'disconnected') {
+          setWorkerNotice('disconnected', 'WORKER DISCONNECTED — the ESP32 stopped responding. Showing demo data while the dashboard retries the connection.');
+        } else if (!discoveryEnabled) {
+          setWorkerNotice('simulating', 'SIMULATED DEMO FEED — choose Search active worker whenever you want to look for the ESP32.');
+        } else {
+          setWorkerNotice('simulating', `NO ACTIVE WORKER FOUND — searching for ${DEFAULT_DISCOVERY_HOST}. Showing demo data while discovery continues.`);
+        }
+        render(workers, mode);
+      }
+
+      async function poll() {
+        if (pollInProgress) return;
+        pollInProgress = true;
+        try {
+          if (!discoveryEnabled) {
+            onWorkersReceived(advanceSimulation(), 'simulating');
+            return;
+          }
+          const candidates = searchRequested
+            ? [DEFAULT_DISCOVERY_HOST, endpointHost]
+            : [endpointHost || DEFAULT_DISCOVERY_HOST];
+          const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
+          let lastError;
+          for (const host of uniqueCandidates) {
+            try {
+              const workers = await fetchWorkers(host);
+              endpointHost = host;
+              localStorage.setItem(STORAGE_KEY, endpointHost);
+              searchRequested = false;
+              poll.hasShownConnectionError = false;
+              onWorkersReceived(workers, 'connected');
+              return;
+            } catch (error) {
+              lastError = error;
+            }
+          }
+          searchRequested = false;
+          const mode = hasConnectedWorker ? 'disconnected' : 'simulating';
+          onWorkersReceived(advanceSimulation(), mode);
+          if (!poll.hasShownConnectionError && lastError) {
+            showToast(hasConnectedWorker
+              ? 'Worker disconnected. Reconnecting and showing the demo feed.'
+              : `No worker found yet; demo feed is running (${lastError.name === 'AbortError' ? 'request timed out' : 'check Wi-Fi, mDNS, and browser local-network permission'}).`);
+            poll.hasShownConnectionError = true;
+          }
+        } finally {
+          pollInProgress = false;
+        }
+      }
+
+      function openModal() {
+        elements.ipInput.value = endpointHost;
+        elements.modal.classList.remove('hidden');
+        elements.modal.classList.add('flex');
+        setTimeout(() => elements.ipInput.focus(), 0);
+      }
+
+      function closeModal() {
+        elements.modal.classList.add('hidden');
+        elements.modal.classList.remove('flex');
+      }
+
+      function normalizeHost(input) {
+        let value = input.trim().replace(/^https?:\/\//i, '').replace(/\/$/, '');
+        if (!value) return '';
+        if (/[/?#\s]/.test(value)) throw new Error('Enter only a local IP address or hostname, without a path.');
+        let parsed;
+        try { parsed = new URL(`http://${value}`); } catch (_) { throw new Error('Enter a valid local IP address or hostname.'); }
+        if (parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) throw new Error('Enter only a local IP address or hostname, without a path.');
+        return parsed.host;
+      }
+
+      document.addEventListener('pointerdown', unlockAudio, { once: true });
+      document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeModal(); });
+      $('open-settings').addEventListener('click', openModal);
+      $('search-worker').addEventListener('click', () => {
+        discoveryEnabled = true;
+        searchRequested = true;
+        poll.hasShownConnectionError = false;
+        setWorkerNotice('simulating', `SEARCHING FOR ACTIVE WORKER — probing ${DEFAULT_DISCOVERY_HOST} and the saved device address.`);
+        poll();
+      });
+      $('help-link').addEventListener('click', openModal);
+      $('close-settings').addEventListener('click', closeModal);
+      elements.modal.addEventListener('click', (event) => { if (event.target === elements.modal) closeModal(); });
+      $('use-demo').addEventListener('click', () => {
+        endpointHost = '';
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(CONNECTED_KEY);
+        searchRequested = false;
+        discoveryEnabled = false;
+        poll.hasShownConnectionError = false;
+        closeModal();
+        showToast('Simulated demo feed enabled.');
+        poll();
+      });
+      $('settings-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        try {
+          endpointHost = normalizeHost(elements.ipInput.value);
+          if (!endpointHost) throw new Error('Enter an ESP32 IP address, or choose the demo feed.');
+          discoveryEnabled = true;
+          searchRequested = true;
+          localStorage.setItem(STORAGE_KEY, endpointHost);
+          poll.hasShownConnectionError = false;
+          closeModal();
+          showToast(`Connecting to http://${endpointHost}/api/data`);
+          poll();
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+      elements.workerGrid.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const key = String(button.dataset.id || '');
+        if (button.dataset.action === 'acknowledge') {
+          const worker = latestWorkers.find((item) => String(item.id) === key);
+          if (worker) {
+            if (worker.sos) acknowledged.add(`sos:${key}`);
+            if (worker.fallReported || vectorMagnitude(worker.acceleration) >= FALL_THRESHOLD_MPS2) acknowledged.add(`fall:${key}`);
+          }
+          renderCurrent();
+          showToast('Alert acknowledged. It will reappear if the sensor reports a new event.');
+        } else if (button.dataset.action === 'call') {
+          showToast(`Mock call initiated for ${button.dataset.name}.`);
+        }
+      });
+
+      function renderCurrent() {
+        render(latestWorkers, latestMode);
+      }
+
+      const themeToggle = $('theme-toggle');
+      function applyTheme(theme) {
+        const selectedTheme = theme === 'light' ? 'light' : 'dark';
+        const nextTheme = selectedTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = selectedTheme;
+        $('theme-label').textContent = `${nextTheme[0].toUpperCase()}${nextTheme.slice(1)} theme`;
+        $('theme-icon').textContent = selectedTheme === 'dark' ? '☀' : '☾';
+        themeToggle.setAttribute('aria-label', `Switch to ${nextTheme} theme`);
+        themeToggle.setAttribute('aria-pressed', String(selectedTheme === 'light'));
+        try { localStorage.setItem('shieldguard-theme', selectedTheme); } catch (_) { /* Theme still works for this page view. */ }
+      }
+      themeToggle.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+      applyTheme(document.documentElement.dataset.theme || 'dark');
+      tickClock();
+      setInterval(tickClock, 1000);
+      poll();
+      setInterval(poll, POLL_INTERVAL_MS);
+    })();
+  </script>
+</body>
+</html>

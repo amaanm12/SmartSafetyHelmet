@@ -367,6 +367,7 @@
             sensorTemperatureC: sensorTemperature !== null && sensorTemperature !== undefined && Number.isFinite(Number(sensorTemperature)) ? Number(sensorTemperature) : null,
             acceleration,
             gyroscope,
+            imuAvailable: row.imuAvailable !== false,
             sos: Boolean(row.sos ?? row.sosActive ?? row.alarm ?? row.touchAlarm),
             sosCountdownS: Math.max(0, numberOr(row.sosCountdownS, 0)),
             fallReported: Boolean(row.fallDetected ?? row.fall ?? false)
@@ -412,6 +413,7 @@
       }
 
       function isMovementActive(worker) {
+        if (worker.imuAvailable === false) return false;
         const accelerationDelta = Math.abs(vectorMagnitude(worker.acceleration) - 9.81);
         return accelerationDelta > 0.35 || vectorMagnitude(worker.gyroscope) > 0.15;
       }
@@ -441,7 +443,9 @@
             ? '<span class="rounded-full border border-signal-red/30 bg-signal-red/10 px-2.5 py-1 text-[10px] font-bold tracking-wider text-signal-red">FALL DETECTED</span>'
             : `<span class="rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-wider ${tempStyle.badge}">${tempStyle.label}</span>`;
         const tempDisplay = worker.temperatureC === null ? '—.-' : worker.temperatureC.toFixed(1);
-        const sensorTempNote = worker.sensorTemperatureC === null || worker.sensorTemperatureC === undefined
+        const sensorTempNote = worker.imuAvailable === false
+          ? '<p class="mt-1 text-[10px] text-slate-500">IMU readings disabled for alarm test</p>'
+          : worker.sensorTemperatureC === null || worker.sensorTemperatureC === undefined
           ? '<p class="mt-1 text-[10px] text-slate-600">No body temperature sensor reported</p>'
           : `<p class="mt-1 text-[10px] text-slate-500">MPU6050 board temperature: ${worker.sensorTemperatureC.toFixed(1)} °C</p>`;
         const alertLine = sosActive && !sosAcknowledged
@@ -456,7 +460,7 @@
           <div class="flex items-start justify-between gap-3">
             <div class="flex min-w-0 items-center gap-3">
               <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[.08] bg-ink-800 font-mono text-sm font-bold text-slate-300">${escapeHtml(key.slice(0, 3))}</div>
-              <div class="min-w-0"><h3 class="truncate font-semibold text-white">${escapeHtml(worker.name)}</h3><p class="mt-0.5 text-[11px] text-slate-500">${worker.active ? 'ON SHIFT · SENSOR ONLINE' : 'OFFLINE'}</p></div>
+              <div class="min-w-0"><h3 class="truncate font-semibold text-white">${escapeHtml(worker.name)}</h3><p class="mt-0.5 text-[11px] text-slate-500">${worker.active ? (worker.imuAvailable === false ? 'ON SHIFT · IMU DISABLED' : 'ON SHIFT · SENSOR ONLINE') : 'OFFLINE'}</p></div>
             </div>
             ${statusBadge}
           </div>
@@ -470,11 +474,11 @@
           <div class="mt-4 grid grid-cols-2 gap-3">
             <div class="rounded-xl border border-white/[.06] bg-white/[.02] p-3">
               <div class="mb-2 flex items-center justify-between"><p class="text-[10px] font-semibold uppercase tracking-[.13em] text-slate-500">Acceleration</p><span class="text-[9px] text-slate-600">m/s²</span></div>
-              <div class="grid grid-cols-3 gap-1 font-mono text-xs tabular-nums"><div><span class="text-signal-blue">X</span> <span class="text-slate-200">${acceleration.x.toFixed(2)}</span></div><div><span class="text-signal-blue">Y</span> <span class="text-slate-200">${acceleration.y.toFixed(2)}</span></div><div><span class="text-signal-blue">Z</span> <span class="text-slate-200">${acceleration.z.toFixed(2)}</span></div></div>
+              <div class="grid grid-cols-3 gap-1 font-mono text-xs tabular-nums"><div><span class="text-signal-blue">X</span> <span class="text-slate-200">${displayAxis(acceleration.x)}</span></div><div><span class="text-signal-blue">Y</span> <span class="text-slate-200">${displayAxis(acceleration.y)}</span></div><div><span class="text-signal-blue">Z</span> <span class="text-slate-200">${displayAxis(acceleration.z)}</span></div></div>
             </div>
             <div class="rounded-xl border border-white/[.06] bg-white/[.02] p-3">
               <div class="mb-2 flex items-center justify-between"><p class="text-[10px] font-semibold uppercase tracking-[.13em] text-slate-500">Gyroscope</p><span class="text-[9px] text-slate-600">rad/s</span></div>
-              <div class="grid grid-cols-3 gap-1 font-mono text-xs tabular-nums"><div><span class="text-violet-400">X</span> <span class="text-slate-200">${gyroscope.x.toFixed(2)}</span></div><div><span class="text-violet-400">Y</span> <span class="text-slate-200">${gyroscope.y.toFixed(2)}</span></div><div><span class="text-violet-400">Z</span> <span class="text-slate-200">${gyroscope.z.toFixed(2)}</span></div></div>
+              <div class="grid grid-cols-3 gap-1 font-mono text-xs tabular-nums"><div><span class="text-violet-400">X</span> <span class="text-slate-200">${displayAxis(gyroscope.x)}</span></div><div><span class="text-violet-400">Y</span> <span class="text-slate-200">${displayAxis(gyroscope.y)}</span></div><div><span class="text-violet-400">Z</span> <span class="text-slate-200">${displayAxis(gyroscope.z)}</span></div></div>
             </div>
           </div>
           <div class="mt-3 flex items-center justify-between rounded-xl border border-white/[.06] bg-white/[.02] px-3 py-2.5">

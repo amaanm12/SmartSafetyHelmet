@@ -14,8 +14,8 @@ struct AlarmStatus {
 };
 
 // Keeps all Wi-Fi and network details out of main.cpp. begin() connects the
-// ESP32 to Wi-Fi and starts its web API; update() gives that API fresh readings
-// and lets it answer browser requests.
+// ESP32 to Wi-Fi in the background; update() starts the API once connected,
+// gives it fresh readings, and lets it answer browser requests.
 class WifiCommunication {
 public:
     void begin(AlarmCommandHandler onCallWorker, AlarmCommandHandler onTriggerSos);

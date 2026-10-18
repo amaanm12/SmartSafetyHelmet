@@ -54,7 +54,7 @@ bool onFallDetected() {
 
     digitalWrite(BUZZER_PIN, BUZZER_OFF);
     digitalWrite(RED_LED_PIN, LOW);
-    ledState = false;
+    pinMode(RED_LED_PIN, OUTPUT);
 
     Serial.println();
     Serial.println("========================");
@@ -99,11 +99,11 @@ void cancelPendingSOS() {
 
     digitalWrite(BUZZER_PIN, BUZZER_OFF);
     digitalWrite(RED_LED_PIN, LOW);
-    ledState = false;
 
     Serial.println();
-    Serial.println("SOS CANCELLED");
-    Serial.println("No emergency alert triggered");
+    Serial.println("POSSIBLE FALL DETECTED - state available to the dashboard when connected.");
+    Serial.println("There are 15 seconds to cancel the SOS.");
+    Serial.println("Hold touch sensor for 2 seconds to cancel.");
 }
 
 void acknowledgeSOS() {
@@ -282,8 +282,8 @@ void alarmUpdate() {
         }
     }
 
-    // SOS ACTIVE
-    if (state == SOS_ACTIVE) {
+void AlarmSystem::updateOutputs(uint32_t now) {
+    if (state_ != State::SosActive) return;
 
         digitalWrite(BUZZER_PIN, BUZZER_ON);
 

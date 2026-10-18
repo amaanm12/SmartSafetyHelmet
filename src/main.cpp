@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "alarm.h"
+#include "detection.h"
 #include "sensor.h"
 #include "wifi_communication.h"
 
@@ -8,12 +9,10 @@ namespace {
 // These pins match the ESP32-WROOM-32 wiring in README.md.
 constexpr int I2C_SDA_PIN = 21;
 constexpr int I2C_SCL_PIN = 22;
-constexpr uint32_t IMU_SAMPLE_INTERVAL_MS = 100;
 
 IMUSensor imu;
 WifiCommunication wifi;
 bool imuReady = false;
-uint32_t lastImuSampleAt = 0;
 }
 
 void setup() {
@@ -37,14 +36,22 @@ void setup() {
 }
 
 void loop() {
-    // loop() repeats continuously: keep the alarm responsive, sample the IMU
-    // every 100 ms, and let the web server answer browser requests.
+    // Keep the alarm and Wi-Fi running around the teammate's sampling loop.
     alarmUpdate();
 
-    const uint32_t now = millis();
-    if (imuReady && now - lastImuSampleAt >= IMU_SAMPLE_INTERVAL_MS) {
-        lastImuSampleAt = now;
+    if (imuReady) {
         imu.update();
+        IMUData r = imu.getData();
+        float score;
+        bool fallEvent;
+        if (updateFallModel(r.accX, r.accY, r.accZ,
+                            r.gyroX, r.gyroY, r.gyroZ, score, fallEvent)) {
+            if(fallEvent) {
+                Serial.println("FALL DETECTED");
+                // Connect his detection result to the existing helmet alarm.
+                onFallDetected();
+            }
+        }
     }
 
     wifi.update(imu.getData(), {alarmIsSosActive(), alarmIsCallActive(), alarmSosCountdownSeconds()});

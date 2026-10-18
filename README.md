@@ -1,149 +1,90 @@
 # Smart Safety Helmet
 
-## How the ESP32 and dashboard work together
+ML fall detection is integrated from `ml-algorithm` commit `766dd55`.
+`include/fall_model.h` contains the unchanged model; `src/detection.cpp`
+contains the helper and its buffer declarations copied verbatim from the
+teammate's `main.cpp`, exposed through `include/detection.h`.
 
-There are two separate programs:
+`src/main.cpp` samples the MPU6050 on SDA GPIO21 / SCL GPIO22 once per loop
+with `delay(10)`, matching the teammate's loop. It feeds all six acceleration
+and gyroscope axes into `updateFallModel(...)`. The first prediction needs
+100 samples (about 1 second); later predictions run every 20 new samples
+(about 200 ms). A probability of at least 0.6 is a positive prediction.
 
-1. The ESP32 firmware reads the MPU6050 and SOS button. It joins your Wi-Fi
-   network and makes the latest reading available from a small web API.
-2. The dashboard is the `index.html` page. Your browser opens that page and
-   asks the ESP32 for the latest readings every two seconds.
+A positive prediction calls `onFallDetected()` to start the existing
+15-second cancellable SOS countdown. The Wi-Fi API and dashboard already
+report the countdown and SOS state. Every positive prediction calls the alarm,
+which ignores calls while a countdown or SOS is already active. A subsequent
+positive prediction can start a new countdown after the worker cancels it.
+The dashboard's separate high-acceleration indicator remains unchanged.
 
-The dashboard does not connect to the MPU6050 directly. The path is:
+Build with `pio run`, then upload with `pio run --target upload` (COM3).
+The inference cadence and model scores can be checked on a computer with:
 
-```text
-MPU6050 and SOS button → ESP32 → Wi-Fi router → browser running the dashboard
+```powershell
+g++ -std=c++11 -I include src/detection.cpp test/fall_model_window_test.cpp -o .pio/fall_model_window_test.exe
+.\.pio\fall_model_window_test.exe
 ```
 
-The browser's repeated HTTP requests are sometimes called polling. The ESP32
-does not push data into GitHub Pages; the browser checks the ESP32 for fresh
-data each time. If a node that was working stops answering, the page shows a
-red **WORKER DISCONNECTED** message and keeps retrying.
+These checks validate integration, not real-world detection accuracy.
 
-## First-time Wi-Fi setup
 
-You do not need to put your Wi-Fi password in the source code. The firmware
-uses WiFiManager to save the network details on the ESP32:
+## Set Wi-Fi using .env
 
-1. Connect the ESP32 to your computer and open the PlatformIO Serial Monitor at
-   **115200 baud**.
-2. Power on or reset the ESP32. If it has no saved Wi-Fi network, the serial
-   output prints a temporary network name such as `ShieldGuard-Setup-...` and
-   its password.
-3. On a phone or computer, join that temporary setup network. A setup page
-   should open. If it does not, browse to `http://192.168.4.1` while connected
-   to the setup network.
-4. Choose the Wi-Fi network the ESP32 should join and enter that network's
-   password. The ESP32 saves these details and joins the network.
-5. The serial output prints the ESP32's local IP address and the dashboard URL:
-   `http://shieldguard.local/api/data`.
-6. Connect the computer or phone that will show the dashboard to that same
-   Wi-Fi network. Open the GitHub Pages dashboard and choose **Search active
-   worker** if it has not connected automatically.
+Open `.env` in the project folder and enter the same 2.4 GHz Wi-Fi network
+your laptop uses:
 
-The temporary `ShieldGuard-Setup-*` network is only for configuring Wi-Fi. It
-is not the normal connection used to send worker readings.
-
-## Do the ESP32 and dashboard need the same Wi-Fi?
-
-For automatic discovery, yes: keep them on the same local Wi-Fi network. A
-phone hotspot can work if both the ESP32 and a separate dashboard device join
-that hotspot and the hotspot allows devices to talk to each other. Guest Wi-Fi
-and some hotspots isolate connected devices, which blocks discovery and data.
-
-The ESP32 sends a UDP discovery announcement on port `4210`. Browsers cannot
-listen for UDP packets, so the dashboard finds this one-worker setup with the
-local name `shieldguard.local` over HTTP. The UDP announcement is available to
-local network tools and future bridge software. If mDNS name lookup does not
-work on your network, enter the local IP printed in Serial Monitor using the
-dashboard's **Edit IP** button.
-
-GitHub Pages uses HTTPS, while this ESP32 API uses HTTP. When the browser asks,
-allow the dashboard site to access your local network. If the request is still
-blocked, the Connection Settings panel explains the browser's Insecure Content
-setting. The ESP32 API includes CORS headers so the browser can read its
-response. CORS does not grant local-network access by itself.
-
-## What the dashboard receives
-
-Every two seconds the browser requests `GET /api/data`. The ESP32 responds with
-JSON, a structured text format. For example:
-
-```json
-{
-  "workers": [
-    {
-      "id": "1",
-      "name": "Worker #1",
-      "active": true,
-      "temperatureC": null,
-      "sensorTemperatureC": 25.4,
-      "acceleration": { "x": 0.1, "y": 0.0, "z": 9.8 },
-      "gyroscope": { "x": 0.0, "y": 0.1, "z": 0.0 },
-      "sos": false
-    }
-  ]
-}
+```dotenv
+WIFI_SSID="Your network name"
+WIFI_PASSWORD="Your network password"
 ```
 
-The acceleration values are in metres per second squared (`m/s²`). Gyroscope
-values are in radians per second (`rad/s`). `sos` becomes `true` while the
-optional button is pressed.
+Save the file, then build and upload again. PlatformIO reads `.env` during the
+build and includes its settings in the firmware. The ESP32 tries that network
+for 20 seconds at startup, then falls back to saved Wi-Fi or the setup portal.
+Leave the values empty to use the original setup portal flow. Keep quotes
+around values containing spaces or special characters; their contents are
+literal. `.env` and the generated header are ignored by Git. Credentials are
+still part of the uploaded firmware, so keep firmware binaries private too.
 
-The MPU6050 has a small temperature sensor inside the chip. It measures the
-chip temperature, not a worker's body temperature. That is why the ESP32 sends
-`temperatureC: null` for body temperature and sends the chip reading separately
-as `sensorTemperatureC`. The dashboard's body-temperature average will show no
-reading until a body-temperature sensor is added.
+## Try the serial fall alarm
 
-## ESP32-WROOM-32 to MPU6050 wiring
+The firmware accepts a simulated fall command from PlatformIO Serial Monitor. A fall appears on the website right away as **FALL PENDING**. If it is not cancelled within 15 seconds, the ESP32 turns on the buzzer and flashes the red LED; the website changes to **SOS ACTIVE**.
 
-Connect the MPU6050 breakout to the ESP32 I2C pins used by `src/main.cpp`:
+1. Connect the ESP32 to the same Wi-Fi network as the computer or phone that will open the dashboard. On first boot, WiFiManager guides you through joining the Wi-Fi.
+2. Upload the project for the `esp32dev` board and open Serial Monitor at **115200 baud**.
+3. Open the dashboard and connect it to the ESP32. The ESP32 IP address is printed in Serial Monitor; the page also tries `shieldguard.local`.
+4. Type `f` and press Enter. The dashboard should show the pending fall, then SOS after 15 seconds.
+5. Type `r` and press Enter to turn the alarm off and clear its dashboard state. The touch sensor can also cancel the countdown or silence SOS if held for two seconds.
 
-| MPU6050 pin | ESP32-WROOM-32 pin | Notes |
+Serial Monitor now shows your typing (`monitor_echo = yes`) and sends it when
+you press Enter (`send_on_enter`). Click inside the **Terminal** panel running
+PlatformIO Serial Monitor; the **Output** panel is a log viewer and cannot send
+commands. The alarm commands work while Wi-Fi is still connecting. Once the
+network connects, the API starts and the dashboard sees the current alarm.
+Reopen Serial Monitor after changing its settings. If the ESP32 keeps printing
+only boot/reset lines, it is restarting and cannot process commands normally;
+the `[BOOT]` and `[READY]` messages help identify how far startup gets.
+
+The browser polls the ESP32's `http://<ESP32-IP>/api/data` endpoint every two seconds. Because GitHub Pages is HTTPS and the ESP32 API uses local HTTP, allow local-network access for the site. The dashboard's Connection Settings panel has browser-specific guidance.
+
+## Alarm wiring (ESP32-WROOM-32)
+
+| Alarm part | ESP32 pin | Notes |
 | --- | --- | --- |
-| VCC | 3V3 | Use 3.3 V for the sensor breakout. |
-| GND | GND | Grounds must be common. |
-| SDA | GPIO 21 | I2C data. |
-| SCL | GPIO 22 | I2C clock. |
-| AD0 | GND (optional) | Selects the default I2C address, usually `0x68`. |
-| INT | Not connected | Not used by this firmware. |
-| SOS switch | GPIO 27 to GND | Optional momentary pushbutton; pressed means SOS active. |
+| Touch sensor digital output | GPIO 27 | Active HIGH. The ESP32 uses an internal pull-down. |
+| Active-low buzzer module input | GPIO 25 | The code turns the buzzer on by driving LOW. |
+| Red LED | GPIO 26 | Add a current-limiting resistor, such as 220 Ω, in series. |
+| Grounds | GND | Sensor and ESP32 grounds must be connected together. |
 
-```text
-ESP32-WROOM-32             MPU6050
-3V3 ---------------------- VCC
-GND ---------------------- GND
-GPIO 21 ------------------ SDA
-GPIO 22 ------------------ SCL
-GND ---------------------- AD0 (optional; default address 0x68)
-GPIO 27 ---- momentary switch ---- GND (optional SOS button)
-```
+Use a buzzer module or a suitable transistor driver if the buzzer needs more current than an ESP32 GPIO can provide. Do not connect a high-current buzzer directly to the pin.
 
-The firmware initializes I2C with GPIO 21 for SDA and GPIO 22 for SCL. If you
-change those wires, update `I2C_SDA_PIN` or `I2C_SCL_PIN` in `src/main.cpp`.
-
-The optional SOS switch connects GPIO 27 to GND when pressed. The firmware uses
-the ESP32's internal pull-up resistor, so no external resistor is needed.
+The MPU6050 remains optional for this alarm demo. Its I2C pins are GPIO 21 (SDA) and GPIO 22 (SCL), so they do not overlap the alarm pins. If the MPU6050 is missing, the firmware continues and the website shows dashes for IMU readings. The previous SOS button reader on GPIO 27 is not started because that pin is used by Amaan's touch sensor.
 
 ## Where the code lives
 
-- `src/main.cpp` starts each helper and passes sensor readings to the network.
-- `src/sensor.cpp` reads acceleration, gyroscope, and MPU6050 chip temperature.
-- `src/wifi_communication.cpp` connects Wi-Fi, serves the HTTP API, publishes
-  the mDNS name, and sends UDP discovery announcements.
-- `src/sos_button.cpp` reads the SOS switch and filters button contact bounce.
-- `index.html` contains the dashboard, its automatic search, and demo fallback.
-
-## If the dashboard cannot find the worker
-
-- Check Serial Monitor at 115200 baud for `Connected to Wi-Fi` and the IP address.
-- Check that both devices joined the same Wi-Fi network and that it does not
-  isolate connected devices.
-- Try the IP address from Serial Monitor in the dashboard's **Edit IP** panel.
-- Allow the browser's local-network prompt for the GitHub Pages site. If needed,
-  follow the Insecure Content instructions in Connection Settings.
-- Open `http://<ESP32-IP>/api/health` on the same network. A JSON response means
-  the ESP32 web server is reachable; a browser error may still mean the
-  dashboard's cross-origin or local-network permission was blocked.
-- If the page says **WORKER DISCONNECTED**, check ESP32 power and Wi-Fi signal.
+- `src/main.cpp` starts the alarm and Wi-Fi modules and optionally reads the MPU6050.
+- `src/alarm.cpp` handles Serial Monitor commands, the 15-second cancel period, touch cancellation, buzzer output, and LED flashing.
+- `src/wifi_communication.cpp` connects to Wi-Fi and serves the worker JSON, including `fallDetected`, `sos`, and `alarmState`.
+- `index.html` polls the ESP32 and displays pending fall and active SOS states on the worker card.
+- `src/sensor.cpp` reads MPU6050 acceleration, rotation, and chip temperature when that sensor is connected.

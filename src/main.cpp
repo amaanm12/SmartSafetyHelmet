@@ -1,39 +1,59 @@
 #include <Arduino.h>
 
+#include "alarm.h"
+#include "detection.h"
 #include "sensor.h"
-#include "sos_button.h"
 #include "wifi_communication.h"
 
 namespace {
 // These pins match the ESP32-WROOM-32 wiring in README.md.
 constexpr int I2C_SDA_PIN = 21;
 constexpr int I2C_SCL_PIN = 22;
-constexpr int SOS_BUTTON_PIN = 27;
 
 IMUSensor imu;
-SosButton sosButton;
 WifiCommunication wifi;
+bool imuReady = false;
 }
 
 void setup() {
     Serial.begin(115200);
+    delay(500);
 
-    // setup() runs once after the ESP32 powers on or resets. Stop here if the
-    // MPU6050 is not connected, because there would be no real sensor data to send.
-    if (!imu.begin(I2C_SDA_PIN, I2C_SCL_PIN)) {
-        Serial.println("MPU6050 initialization failed. Check the wiring.");
-        while (true) delay(1000);
+    // Start the touch sensor, buzzer and LED first so the alarm works even
+    // if the MPU6050 is missing.
+    alarmBegin();
+
+    // setup() runs once after the ESP32 powers on or resets.
+    imuReady = imu.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    if (!imuReady) {
+        Serial.println("MPU6050 initialization failed. Check the wiring. Continuing without IMU data.");
     }
 
-    // Start the button reader and connect the Wi-Fi/API services.
-    sosButton.begin(SOS_BUTTON_PIN);
-    wifi.begin();
+    // Connect to Wi-Fi and start the web API. The dashboard's "Call worker"
+    // button runs alarmCallWorker() to beep the buzzer, and "Trigger SOS" runs
+    // onFallDetected() to start the 15 second countdown.
+    wifi.begin(alarmCallWorker, onFallDetected);
 }
 
 void loop() {
-    // loop() repeats continuously: read the sensors, pass the latest readings
-    // to the web server, then wait briefly before taking the next sample.
-    imu.update();
-    wifi.update(imu.getData(), sosButton.update());
-    delay(100);
+    // Keep the alarm and Wi-Fi running around the teammate's sampling loop.
+    alarmUpdate();
+
+    if (imuReady) {
+        imu.update();
+        IMUData r = imu.getData();
+        float score;
+        bool fallEvent;
+        if (updateFallModel(r.accX, r.accY, r.accZ,
+                            r.gyroX, r.gyroY, r.gyroZ, score, fallEvent)) {
+            if(fallEvent) {
+                Serial.println("FALL DETECTED");
+                // Connect his detection result to the existing helmet alarm.
+                onFallDetected();
+            }
+        }
+    }
+
+    wifi.update(imu.getData(), {alarmIsSosActive(), alarmIsCallActive(), alarmSosCountdownSeconds()});
+    delay(10);
 }

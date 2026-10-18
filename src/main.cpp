@@ -54,8 +54,9 @@ void loop() {
     bool fallEvent;
     if (updateFallModel(r.accX, r.accY, r.accZ,
                         r.gyroX, r.gyroY, r.gyroZ, score, fallEvent)) {
-        Serial.printf("%lu,%.6f,%s\n", millis(), score,
-                      fallEvent ? "FALL_EVENT" : "NO_FALL");
+        if(fallEvent) {
+            Serial.println("FALL DETECTED");
+        }
     }
     delay(10);
 }

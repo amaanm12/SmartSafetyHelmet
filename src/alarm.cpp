@@ -1,6 +1,8 @@
 
 #include <Arduino.h>
 
+#include "alarm.h"
+
 
 
 #define TOUCH_PIN 27
@@ -13,34 +15,40 @@
 #define BUZZER_OFF HIGH
 
 const unsigned long FALL_CANCEL_TIME = 15000;
-const unsigned long TOUCH_HOLD_TIME = 2000;
 const unsigned long LED_FLASH_INTERVAL = 500;
+
+// "Call worker" from the dashboard: beep on/off until answered or timed out.
+const unsigned long CALL_BEEP_INTERVAL = 300;
+const unsigned long CALL_TIMEOUT = 30000;
 
 enum SystemState {
     NORMAL,
     FALL_PENDING,
-    SOS_ACTIVE
+    SOS_ACTIVE,
+    CALL_ACTIVE
 };
 
 SystemState state = NORMAL;
 
 unsigned long fallStart = 0;
-unsigned long touchStart = 0;
 unsigned long lastCountdown = 0;
 unsigned long lastLedToggle = 0;
+unsigned long callStart = 0;
+unsigned long lastBeepToggle = 0;
 
 bool touchReleased = false;
 bool ledState = false;
+bool beepState = false;
 
 
-void onFallDetected() {
+bool onFallDetected() {
 
-    if (state != NORMAL) return;
+    // A fall is more important than a supervisor call, so it replaces it.
+    if (state != NORMAL && state != CALL_ACTIVE) return false;
 
     state = FALL_PENDING;
 
     fallStart = millis();
-    touchStart = 0;
     lastCountdown = 0;
     touchReleased = false;
 
@@ -53,7 +61,9 @@ void onFallDetected() {
     Serial.println("POSSIBLE FALL DETECTED!");
     Serial.println("========================");
     Serial.println("15 seconds to cancel SOS");
-    Serial.println("Hold touch for 2 seconds");
+    Serial.println("Tap touch sensor to cancel");
+
+    return true;
 }
 
 
@@ -61,7 +71,6 @@ void triggerSOS() {
 
     state = SOS_ACTIVE;
 
-    touchStart = 0;
     touchReleased = false;
 
 
@@ -78,7 +87,7 @@ void triggerSOS() {
     Serial.println("!!!!!!!!!!!!!!!!!!!!!!!!");
     Serial.println("BUZZER: ON");
     Serial.println("RED LED: FLASHING");
-    Serial.println("Hold touch 2 sec to silence");
+    Serial.println("Tap touch sensor to silence");
 
 
 }
@@ -86,7 +95,6 @@ void triggerSOS() {
 void cancelPendingSOS() {
 
     state = NORMAL;
-    touchStart = 0;
     touchReleased = false;
 
     digitalWrite(BUZZER_PIN, BUZZER_OFF);
@@ -101,7 +109,6 @@ void cancelPendingSOS() {
 void acknowledgeSOS() {
 
     state = NORMAL;
-    touchStart = 0;
     touchReleased = false;
 
     digitalWrite(BUZZER_PIN, BUZZER_OFF);
@@ -116,11 +123,61 @@ void acknowledgeSOS() {
 
 }
 
+bool alarmCallWorker() {
 
-void setup() {
+    // Don't interrupt a fall countdown or an active SOS.
+    if (state == FALL_PENDING || state == SOS_ACTIVE) return false;
 
-    Serial.begin(115200);
-    delay(500);
+    state = CALL_ACTIVE;
+
+    callStart = millis();
+    lastBeepToggle = callStart;
+    touchReleased = false;
+
+    beepState = true;
+    digitalWrite(BUZZER_PIN, BUZZER_ON);
+
+    Serial.println();
+    Serial.println("========================");
+    Serial.println("SUPERVISOR IS CALLING!");
+    Serial.println("========================");
+    Serial.println("Tap touch sensor to answer");
+
+    return true;
+}
+
+void endCall(const char* reason) {
+
+    state = NORMAL;
+    touchReleased = false;
+
+    beepState = false;
+    digitalWrite(BUZZER_PIN, BUZZER_OFF);
+
+    Serial.println();
+    Serial.println(reason);
+}
+
+bool alarmIsSosActive() {
+    return state == SOS_ACTIVE;
+}
+
+bool alarmIsCallActive() {
+    return state == CALL_ACTIVE;
+}
+
+unsigned long alarmSosCountdownSeconds() {
+
+    if (state != FALL_PENDING) return 0;
+
+    unsigned long elapsed = millis() - fallStart;
+    if (elapsed >= FALL_CANCEL_TIME) return 0;
+
+    return (FALL_CANCEL_TIME - elapsed + 999) / 1000;
+}
+
+
+void alarmBegin() {
 
     pinMode(TOUCH_PIN, INPUT);
 
@@ -138,15 +195,15 @@ void setup() {
     Serial.println("========================");
     Serial.println("System Ready!");
     Serial.println("f = Simulate Fall");
+    Serial.println("c = Simulate Call Worker");
     Serial.println("r = Reset System");
 }
 
 
-void loop() {
+void alarmUpdate() {
 
-    unsigned long now = millis();
-
-    // SERIAL COMMANDS
+    // SERIAL COMMANDS (handled before reading millis() so a call or fall
+    // started here never has a start time later than "now")
     if (Serial.available()) {
 
         char command = Serial.read();
@@ -155,11 +212,15 @@ void loop() {
             onFallDetected();
         }
 
+        if (command == 'c') {
+            alarmCallWorker();
+        }
+
         if (command == 'r') {
             state = NORMAL;
-            touchStart = 0;
             touchReleased = false;
             ledState = false;
+            beepState = false;
 
             digitalWrite(BUZZER_PIN, BUZZER_OFF);
             digitalWrite(RED_LED_PIN, LOW);
@@ -168,33 +229,33 @@ void loop() {
         }
     }
 
+    unsigned long now = millis();
+
     // READ TOUCH SENSOR
     bool touched =
         digitalRead(TOUCH_PIN) == TOUCH_ACTIVE;
 
-    // TOUCH HOLD DETECTION
+    // TOUCH TAP DETECTION
+    // A tap counts the moment the sensor goes from released to touched. The
+    // sensor must be released first, so a finger already resting on it when
+    // the alarm starts does not instantly silence it.
     if (state == FALL_PENDING ||
-        state == SOS_ACTIVE) {
+        state == SOS_ACTIVE ||
+        state == CALL_ACTIVE) {
 
         if (!touched) {
             touchReleased = true;
-            touchStart = 0;
         }
+        else if (touchReleased) {
 
-        if (touchReleased && touched) {
-
-            if (touchStart == 0) {
-                touchStart = now;
+            if (state == FALL_PENDING) {
+                cancelPendingSOS();
             }
-
-            if (now - touchStart >= TOUCH_HOLD_TIME) {
-
-                if (state == FALL_PENDING) {
-                    cancelPendingSOS();
-                }
-                else if (state == SOS_ACTIVE) {
-                    acknowledgeSOS();
-                }
+            else if (state == SOS_ACTIVE) {
+                acknowledgeSOS();
+            }
+            else if (state == CALL_ACTIVE) {
+                endCall("CALL ANSWERED");
             }
         }
     }
@@ -240,5 +301,23 @@ void loop() {
         }
     }
 
-    delay(10);
+    // CALL ACTIVE: beeping buzzer so it sounds different from the SOS tone
+    if (state == CALL_ACTIVE) {
+
+        if (now - callStart >= CALL_TIMEOUT) {
+            Serial.printf("\nCall rang for %lu ms\n", now - callStart);
+            endCall("CALL NOT ANSWERED (TIMED OUT)");
+        }
+        else if (now - lastBeepToggle >= CALL_BEEP_INTERVAL) {
+
+            lastBeepToggle = now;
+
+            beepState = !beepState;
+
+            digitalWrite(
+                BUZZER_PIN,
+                beepState ? BUZZER_ON : BUZZER_OFF
+            );
+        }
+    }
 }
